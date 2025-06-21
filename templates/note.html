@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - Flask Blog{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <h1>{{ title }}</h1>
+    <div class="mb-4">
+        <a href="{{ url_for('edit_note', note_path=current_note) }}" class="btn btn-outline-secondary btn-sm">Edit</a>
+        <form action="{{ url_for('delete_note', note_path=current_note) }}" method="post" style="display:inline;">
+            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this note?');">Delete</button>
+        </form>
+        <a href="{{ url_for('index') }}" class="btn btn-link btn-sm">Back to Notes</a>
+    </div>
+    <div class="card card-body">
+        {{ html_content|safe }}
+    </div>
+</div>
+{% endblock %}
