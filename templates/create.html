@@ -1,10 +1,55 @@
 {% extends 'base.html' %}
+
 {% block title %}Create Note - Flask Blog{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
+<style>
+.folder-suggestion {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: white;
+}
+.folder-suggestion:hover {
+    background-color: rgba(255,255,255,0.1);
+}
+.folder-suggestion i {
+    opacity: 0.7;
+    width: 16px;
+}
+.folder-suggestion .folder-path {
+    opacity: 0.8;
+    font-size: 0.9em;
+    margin-left: 0.5rem;
+    color: #d0d0d0;
+}
+.dropdown-menu.show {
+    display: block;
+    background: #2d2d2d;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    margin-top: 4px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <form method="post">
-    <div class="mb-3">
-        <label for="title" class="form-label">Title</label>
-        <input id="title" name="title" class="form-control" required>
+    <div class="mb-3 position-relative">
+        <label for="note-path" class="form-label">Note path</label>
+        <div class="input-group">
+            <input type="text" id="note-path" class="form-control" placeholder="folder/subfolder/title" 
+                   autocomplete="off" autocapitalize="off" spellcheck="false"
+                   value="{{ current_folder + '/' if current_folder else '' }}">
+            <input type="hidden" id="title" name="title">
+            <input type="hidden" id="path" name="path">
+        </div>
+        <div id="folder-suggestions" class="dropdown-menu" style="width: 100%; max-height: 300px; overflow-y: auto;"></div>
+        <div class="form-text" style="color: aliceblue;">Type '/' for folder autocomplete. The last segment will be the note title.</div>
     </div>
     <div class="mb-3">
         <label for="content" class="form-label">Content</label>
@@ -14,11 +59,163 @@
     <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
 </form>
 {% endblock %}
+
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/json.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
 <script>
-  const easyMDE = new EasyMDE({
-    element: document.getElementById('content')
-  });
+// Make folders data available to JavaScript
+window.availableFolders = {{ available_folders|tojson|safe }};
+
+// Initialize highlight.js
+window.hljs = hljs;
+
+// Configure highlight.js with secure options
+hljs.configure({
+    ignoreUnescapedHTML: true,
+    throwUnescapedHTML: false,
+    languages: ['python', 'javascript', 'bash', 'markdown', 'json']
+});
+
+const easyMDE = new EasyMDE({
+    element: document.getElementById('content'),
+    renderingConfig: {
+        codeSyntaxHighlighting: true,
+    },
+    previewRender: function(plainText) {
+        // First, escape the markdown using EasyMDE's default renderer
+        let preview = this.parent.markdown(plainText);
+        
+        // After the markdown is rendered, initialize highlighting on any code blocks
+        setTimeout(() => {
+            document.querySelectorAll('pre code').forEach((block) => {
+                // Remove all classes that might be from previous highlights
+                block.className = block.className.replace(/hljs-.*\s*/g, '');
+                
+                // Get the language if specified in the class
+                const language = Array.from(block.classList)
+                    .find(cls => cls.startsWith('language-'))
+                    ?.substring(9);
+                
+                try {
+                    // Apply highlighting using the current API
+                    if (language) {
+                        block.className = `language-${language}`;
+                        hljs.highlightElement(block);
+                    } else {
+                        hljs.highlightElement(block);
+                    }
+                } catch (e) {
+                    console.warn('Error highlighting block:', e);
+                }
+            });
+        }, 0);
+        
+        return preview;
+    }
+});
+
+// GitHub-style path input handler
+document.addEventListener('DOMContentLoaded', function() {
+    const pathInput = document.getElementById('note-path');
+    const titleInput = document.getElementById('title');
+    const pathHiddenInput = document.getElementById('path');
+    const suggestionsDiv = document.getElementById('folder-suggestions');
+    const folders = availableFolders;
+    
+    let currentPath = '';
+    let lastKeyWasSlash = false;
+    
+    function showSuggestions(searchPath) {
+        const parts = searchPath.split('/');
+        const searchTerm = parts[parts.length - 1].toLowerCase();
+        const parentPath = parts.slice(0, -1).join('/');
+        
+        // Filter folders that match the current path and search term
+        const matches = folders.filter(folder => {
+            if (parentPath) {
+                return folder.path.startsWith(parentPath + '/') && 
+                       folder.name.toLowerCase().includes(searchTerm);
+            }
+            return folder.name.toLowerCase().includes(searchTerm);
+        });
+        
+        if (matches.length > 0) {
+            suggestionsDiv.innerHTML = matches.map(folder => `
+                <div class="folder-suggestion" data-path="${folder.path}">
+                    <i class="fa fa-folder text-warning"></i>
+                    <span>${folder.name}</span>
+                    <span class="folder-path">/${folder.path}</span>
+                </div>
+            `).join('');
+            suggestionsDiv.classList.add('show');
+        } else {
+            suggestionsDiv.classList.remove('show');
+        }
+    }
+    
+    function hideSuggestions() {
+        suggestionsDiv.classList.remove('show');
+    }
+    
+    function updateInputs(value) {
+        const parts = value.split('/');
+        const title = parts.pop() || '';
+        const path = parts.join('/');
+        
+        titleInput.value = title;
+        pathHiddenInput.value = path;
+    }
+    
+    pathInput.addEventListener('input', function(e) {
+        const value = e.target.value;
+        updateInputs(value);
+        
+        if (lastKeyWasSlash || value.includes('/')) {
+            showSuggestions(value);
+        } else {
+            hideSuggestions();
+        }
+        
+        lastKeyWasSlash = value.endsWith('/');
+    });
+    
+    pathInput.addEventListener('keydown', function(e) {
+        if (e.key === '/') {
+            lastKeyWasSlash = true;
+        } else {
+            lastKeyWasSlash = false;
+        }
+    });
+    
+    // Handle suggestion clicks
+    suggestionsDiv.addEventListener('click', function(e) {
+        const suggestion = e.target.closest('.folder-suggestion');
+        if (suggestion) {
+            const folderPath = suggestion.dataset.path;
+            pathInput.value = folderPath + '/';
+            updateInputs(pathInput.value);
+            hideSuggestions();
+            pathInput.focus();
+        }
+    });
+    
+    // Close suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#note-path') && !e.target.closest('#folder-suggestions')) {
+            hideSuggestions();
+        }
+    });
+    
+    // Handle initial value if any
+    if (pathInput.value) {
+        updateInputs(pathInput.value);
+    }
+});
 </script>
 {% endblock %}

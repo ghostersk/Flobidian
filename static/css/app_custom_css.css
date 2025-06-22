@@ -234,3 +234,6 @@ color: #6c757d;
 .file-tree-children {
 margin-left: 0;
 }
+#sidebar {
+padding-bottom: 2.5rem !important;
+}

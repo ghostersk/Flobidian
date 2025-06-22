@@ -2,6 +2,10 @@
 
 {% block title %}Edit {{ title }} - Flask Blog{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
+{% endblock %}
+
 {% block content %}
 <form method="post">
     <div class="mb-3">
@@ -14,10 +18,60 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/json.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
 <script>
-  const easyMDE = new EasyMDE({
-    element: document.getElementById('content')
+// Initialize highlight.js
+window.hljs = hljs;
+
+// Configure highlight.js with secure options
+hljs.configure({
+    ignoreUnescapedHTML: true,
+    throwUnescapedHTML: false,
+    languages: ['python', 'javascript', 'bash', 'markdown', 'json']
+});
+
+const easyMDE = new EasyMDE({
+    element: document.getElementById('content'),
+    renderingConfig: {
+        codeSyntaxHighlighting: true,
+    },
+    previewRender: function(plainText) {
+        // First, escape the markdown using EasyMDE's default renderer
+        let preview = this.parent.markdown(plainText);
+        
+        // After the markdown is rendered, initialize highlighting on any code blocks
+        setTimeout(() => {
+            document.querySelectorAll('pre code').forEach((block) => {
+                // Remove all classes that might be from previous highlights
+                block.className = block.className.replace(/hljs-.*\s*/g, '');
+                
+                // Get the language if specified in the class
+                const language = Array.from(block.classList)
+                    .find(cls => cls.startsWith('language-'))
+                    ?.substring(9);
+                
+                try {
+                    // Apply highlighting using the current API
+                    if (language) {
+                        block.className = `language-${language}`;
+                        hljs.highlightElement(block);
+                    } else {
+                        hljs.highlightElement(block);
+                    }
+                } catch (e) {
+                    console.warn('Error highlighting block:', e);
+                }
+            });
+        }, 0);
+        
+        return preview;
+    }
   });
 </script>
 {% endblock %}

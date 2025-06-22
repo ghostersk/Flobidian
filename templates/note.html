@@ -4,8 +4,7 @@
 
 {% block content %}
 <div class="mb-3">
-    <h1>{{ title }}</h1>
-    <div class="mb-4">
+    <div class="mb-3">
         <a href="{{ url_for('edit_note', note_path=current_note) }}" class="btn btn-outline-secondary btn-sm">Edit</a>
         <form action="{{ url_for('delete_note', note_path=current_note) }}" method="post" style="display:inline;">
             <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this note?');">Delete</button>
