@@ -1,5 +1,6 @@
 # Flask application to view Obsidian notes in web browser
 - just point the location of your folder with `.md` notes to app with `NOTES_DIR`
+![image](https://github.com/user-attachments/assets/9d87d4a1-bd76-4640-a633-cf7b629211a9)
 
 ## Configuration
 
@@ -48,3 +49,7 @@ First, let me make sure I understand each mode's requirements:
    - Images stored in IMAGE_SUBFOLDER_NAME under note's directory
    - In .md file: `![[<IMAGE_SUBFOLDER_NAME>/image.png]]`
    - When showing: serve from note's directory/IMAGE_SUBFOLDER_NAME
+     
+![image](https://github.com/user-attachments/assets/02aab7b2-eebf-41ef-914e-1a8543486ffe)
+
+   
