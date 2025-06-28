@@ -1,4 +1,8 @@
 notes/**/
+.github
+mynotes_*
+
+settings.ini
 __pycache__/
 *.py[cod]
 *.pyo

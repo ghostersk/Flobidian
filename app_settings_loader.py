@@ -18,7 +18,23 @@ notes_dir = get_setting('FLASK', 'NOTES_DIR', fallback='notes')
 
 import configparser
 from pathlib import Path
+import os
 
+
+CONFIG_FILE_NAME = 'settings.ini'
+
+# Define the root directory of the project
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(ROOT_DIR, CONFIG_FILE_NAME)
+
+class CaseSensitiveConfigParser(configparser.ConfigParser):
+    """A ConfigParser that preserves key case"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make options case-sensitive
+        self.optionxform = str
+
+# Use uppercase for all DEFAULT_CONFIG keys
 DEFAULT_CONFIG = {
     'FLASK': {
         'FLASK_HOST': '0.0.0.0',
@@ -26,13 +42,32 @@ DEFAULT_CONFIG = {
         'SECRET_KEY': 'change-this-secret',
         'DEBUG': 'False',
         'Specify location where your notes .md files are at - the root folder': None,
-        'NOTES_DIR': 'notes',
         'Maximum content length in MB': None,
         'MAX_CONTENT_LENGTH': '16',
     },
+    'MD_NOTES_APP': {
+        'Name of the application to show in title and navbar': None,
+        'NOTE_APP_NAME': 'Flobidian',
+        'Location where all .md files are stored, you can pass in obsidian vault location too': None,
+        'NOTES_DIR': 'notes',
+        'These folders will not be showed in side panel navigation - used for hiding images for example': None,
+        'NOTES_DIR_HIDE_SIDEPANE': 'attatched, images',
+        'These folders will not be checked by the app - no .md will be viewed if is in': None,
+        'NOTES_DIR_SKIP': 'secret, private',
+        'Hide images from main view': None,
+        'IMAGES_FS_HIDE': 'False',
+        'Storage mode for images (1: root directory, 2: specific folder, 3: same as note, 4: subfolder of note)': None,
+        'IMAGE_STORAGE_MODE': '1',
+        'Path for storing images when mode 2 is selected': None,
+        'IMAGE_STORAGE_PATH': 'images',
+        'Subfolder name when mode 4 is selected': None,
+        'IMAGE_SUBFOLDER_NAME': 'attatched',
+        'Allowed image extensions what will be visible - png is default obsidian image file!': None,
+        'ALLOWED_IMAGE_EXTENSIONS': 'jpg, jpeg, png, webp',
+        'Allowed file extensions for text files what will be visible and viewable': None,
+        'ALLOWED_FILE_EXTENSIONS': 'txt, pdf, html, json, yaml, yml, conf, csv, cmd, bat, sh',
+    },
 }
-
-CONFIG_FILE = 'settings.ini'
 
 def ensure_settings_ini():
     """
@@ -40,6 +75,7 @@ def ensure_settings_ini():
     - If the file does not exist, it is created with default values and comments.
     - If the file exists but is missing any required setting, only the missing setting(s) 
       are added with default values (existing values and comments are not changed).
+    - All keys are normalized to uppercase.
     """
     # First check if file exists at all
     if not Path(CONFIG_FILE).exists():
@@ -163,29 +199,42 @@ def ensure_settings_ini():
         f.write('\n'.join(new_lines) + '\n')
 
 def get_setting(section, key, fallback=None, type_=str):
-    """
-    Retrieve a setting from settings.ini.
-    Args:
-        section (str): The section in the ini file (e.g. 'FLASK').
-        key (str): The key to retrieve.
-        fallback: The value to return if the key is not found.
-        type_ (type): Optionally convert the value to int or bool. Default is str.
-    Returns:
-        The value from settings.ini, converted to the requested type if specified.
-    """
-    config = configparser.ConfigParser()
+    """Get a setting from settings.ini, converting to the specified type"""
+    config = CaseSensitiveConfigParser()
     config.read(CONFIG_FILE)
-    if config.has_option(section, key):
-        value = config.get(section, key)
-        if type_ == int:
-            try:
-                return int(value)
-            except Exception:
-                return fallback if fallback is not None else 0
+    
+    try:
+        section = section.upper()
+        key = key.upper()
         if type_ == bool:
-            return value.lower() in ('true', '1', 'yes', 'on')
-        return value
-    return fallback
+            return config.getboolean(section, key, fallback=fallback)
+        elif type_ == int:
+            return config.getint(section, key, fallback=fallback)
+        elif type_ == float:
+            return config.getfloat(section, key, fallback=fallback)
+        else:
+            return config.get(section, key, fallback=fallback)
+    except Exception as e:
+        print(f"Error getting setting {section}.{key}: {str(e)}")
+        return fallback
+
+def set_setting(section, key, value):
+    """Set a setting in settings.ini"""
+    config = CaseSensitiveConfigParser()
+    config.read(CONFIG_FILE)
+    
+    try:
+        section = section.upper()
+        key = key.upper()
+        if not config.has_section(section):
+            config.add_section(section)
+        config.set(section, key, str(value))
+        with open(CONFIG_FILE, 'w') as f:
+            config.write(f)
+        return True
+    except Exception as e:
+        print(f"Error setting {section}.{key}: {str(e)}")
+        return False
 
 # Load settings from the configuration file settings.ini
 FLASK_HOST = get_setting('FLASK', 'FLASK_HOST', fallback='0.0.0.0')

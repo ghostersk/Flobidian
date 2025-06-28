@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ app_name }} - {{ file_name }}{% endblock %}
+
+{% block content %}
+<div id="content">
+    {% include '_breadcrumbs.html' %}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="m-0">{{ file_name }}</h4>
+            <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm">Back</a>
+        </div>
+        <div class="card-body">
+            <pre class="text-content" style="white-space: pre-wrap;">{{ content }}</pre>
+        </div>
+    </div>
+</div>
+{% endblock %}

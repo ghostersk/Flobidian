@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }} - Settings{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12 mb-4">
+            <h2>Application Settings</h2>
+            <form id="appSettingsForm" class="mt-4">
+                <div class="mb-3">
+                    <label for="app_name" class="form-label">Application Name</label>
+                    <input type="text" class="form-control" id="app_name" name="app_name" required>
+                    <div class="form-text" style="color: aqua;">The name of the application shown in title and navigation.</div>
+                </div>
+                <div class="mb-3">
+                    <label for="hide_sidepane" class="form-label">Hidden Folders (Sidebar)</label>
+                    <input type="text" class="form-control" id="hide_sidepane" name="hide_sidepane">
+                    <div class="form-text" style="color: aqua; ">Comma-separated list of folders to hide from the sidebar (e.g., images, attatched).</div>
+                </div>
+                <div class="mb-3">
+                    <label for="skip_folders" class="form-label">Skip Folders (Access Control)</label>
+                    <input type="text" class="form-control" id="skip_folders" name="skip_folders">
+                    <div class="form-text" style="color: aqua; ">Comma-separated list of folders to completely skip (no access allowed).</div>
+                </div>
+                <div class="mb-3">
+                    <label for="allowed_image_extensions" class="form-label">Allowed Image Extensions</label>
+                    <input type="text" class="form-control" id="allowed_image_extensions" name="allowed_image_extensions">
+                    <div class="form-text" style="color: aqua; ">Comma-separated list of allowed image extensions (e.g., jpg, jpeg, png, gif).</div>
+                </div>
+                <div class="mb-3">
+                    <label for="allowed_file_extensions" class="form-label">Allowed File Extensions</label>
+                    <input type="text" class="form-control" id="allowed_file_extensions" name="allowed_file_extensions">
+                    <div class="form-text" style="color: aqua; ">Comma-separated list of additional file extensions to show and allow viewing (e.g., txt, json, html, csv).</div>
+                </div>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="hide_images" name="hide_images">
+                        <label class="form-check-label" for="hide_images">Hide Images in Folder View</label>
+                        <div class="form-text" style="color: aqua; ">When enabled, images will not be shown in the folder listing.</div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Application Settings</button>
+            </form>
+        </div>
+        
+        <div class="col-md-6">
+            <h2>Notes Directory Settings</h2>
+            <form id="notesDirectoryForm" class="mt-4">
+                <div class="mb-3">
+                    <label for="notes_dir" class="form-label">Notes Directory</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="notes_dir" name="notes_dir" required>
+                        <button type="button" class="btn btn-secondary" id="checkPermissions">Check Access</button>
+                    </div>
+                    <div class="form-text" style="color: aqua; ">Full path to your notes directory. Must have read and write permissions.</div>
+                    <div id="notesDirectoryStatus" class="mt-2"></div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Notes Directory</button>
+            </form>
+        </div>
+        
+        <div class="col-md-6">
+            <h2>Image Storage Settings</h2>
+            <form id="imageStorageForm" class="mt-4">
+                <div class="mb-3">
+                    <label for="storage_mode" class="form-label">Storage Mode</label>
+                    <select class="form-select" id="storage_mode" name="storage_mode">
+                        <option value="1">Notes Root Directory</option>
+                        <option value="2">Specific Folder Path</option>
+                        <option value="3">Same as Edited Note</option>
+                        <option value="4">Subfolder of Note in Subfolder</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3" id="storage_path_group" style="display: none;">
+                    <label for="storage_path" class="form-label">Storage Path</label>
+                    <input type="text" class="form-control" id="storage_path" name="storage_path" placeholder="e.g., images">
+                    <div class="form-text" style="color: aqua; ">Path relative to notes directory</div>
+                </div>
+                
+                <div class="mb-3" id="subfolder_name_group" style="display: none;">
+                    <label for="subfolder_name" class="form-label">Subfolder Name</label>
+                    <input type="text" class="form-control" id="subfolder_name" name="subfolder_name" placeholder="e.g., attatched">
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load current application settings
+    fetch('{{ url_for("md_viewer.app_settings") }}')
+        .then(response => response.json())
+        .then(settings => {
+            if (settings.app_name) document.getElementById('app_name').value = settings.app_name;
+            if (settings.hide_sidepane) document.getElementById('hide_sidepane').value = settings.hide_sidepane;
+            if (settings.skip_folders) document.getElementById('skip_folders').value = settings.skip_folders;
+            if (settings.allowed_image_extensions) document.getElementById('allowed_image_extensions').value = settings.allowed_image_extensions;
+            if (settings.allowed_file_extensions) document.getElementById('allowed_file_extensions').value = settings.allowed_file_extensions;
+            document.getElementById('hide_images').checked = settings.hide_images === 'True';
+        })
+        .catch(error => {
+            window.showNotification('Error loading application settings: ' + error, 'danger');
+        });
+
+    // Load current notes directory
+    fetch('{{ url_for("md_viewer.notes_dir_settings") }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.notes_dir) {
+                document.getElementById('notes_dir').value = data.notes_dir;
+            }
+        })
+        .catch(error => {
+            window.showNotification('Error loading notes directory: ' + error, 'danger');
+        });
+
+    // Load current image storage settings
+    fetch('{{ url_for("md_viewer.image_storage_settings") }}')
+        .then(response => response.json())
+        .then(settings => {
+            if (settings.mode) document.getElementById('storage_mode').value = settings.mode;
+            if (settings.path) document.getElementById('storage_path').value = settings.path;
+            if (settings.subfolder) document.getElementById('subfolder_name').value = settings.subfolder;
+            updateFormVisibility();
+        })
+        .catch(error => {
+            window.showNotification('Error loading image storage settings: ' + error, 'danger');
+        });
+
+    // Handle application settings form submission
+    document.getElementById('appSettingsForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        // Explicitly handle the checkbox state as a string
+        formData.set('hide_images', document.getElementById('hide_images').checked ? 'True' : 'False');
+        
+        fetch('{{ url_for("md_viewer.app_settings") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.showNotification(data.message, 'success');
+                if (data.reload_required) {
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                }
+            } else {
+                throw new Error(data.error || 'Failed to save application settings');
+            }
+        })
+        .catch(error => {
+            window.showNotification('Error: ' + error.message, 'danger');
+        });
+    });
+
+    // Handle notes directory form submission
+    document.getElementById('notesDirectoryForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        
+        fetch('{{ url_for("md_viewer.notes_dir_settings") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.showNotification(data.message, 'success');
+                // Clear folder state in localStorage before reload
+                localStorage.removeItem('expanded-folders');
+                // Wait a moment for the message to be shown
+                setTimeout(() => {
+                    // Do a full page reload to update everything
+                    window.location.reload();
+                }, 2000);
+            } else {
+                throw new Error(data.error || 'Failed to save notes directory');
+            }
+        })
+        .catch(error => {
+            window.showNotification('Error: ' + error.message, 'danger');
+        });
+    });
+
+    // Handle image storage form submission
+    document.getElementById('imageStorageForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        
+        fetch('{{ url_for("md_viewer.image_storage_settings") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.showNotification('Image storage settings saved successfully!', 'success');
+                if (data.reload_required) {
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                }
+            } else {
+                throw new Error(data.error || 'Failed to save settings');
+            }
+        })
+        .catch(error => {
+            window.showNotification('Error: ' + error.message, 'danger');
+        });
+    });
+    
+    // Handle storage mode changes
+    document.getElementById('storage_mode').addEventListener('change', updateFormVisibility);
+    
+    function updateFormVisibility() {
+        const mode = document.getElementById('storage_mode').value;
+        document.getElementById('storage_path_group').style.display = mode === '2' ? 'block' : 'none';
+        document.getElementById('subfolder_name_group').style.display = mode === '4' ? 'block' : 'none';
+    }
+    
+    // Check permissions button
+    document.getElementById('checkPermissions').addEventListener('click', function() {
+        const notesDir = document.getElementById('notes_dir').value;
+        const statusDiv = document.getElementById('notesDirectoryStatus');
+        
+        if (!notesDir) {
+            showMessage('Please enter a directory path', 'error');
+            return;
+        }
+
+        statusDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Checking...';
+        
+        fetch('{{ url_for("md_viewer.check_notes_dir") }}?path=' + encodeURIComponent(notesDir))
+            .then(response => response.json())
+            .then(data => {
+                if (data.valid) {
+                    statusDiv.innerHTML = '<span class="text-success">✓ Directory is accessible</span>';
+                } else {
+                    statusDiv.innerHTML = `<span class="text-danger">⚠ ${data.error}</span>`;
+                }
+            })
+            .catch(error => {
+                statusDiv.innerHTML = '<span class="text-danger">⚠ Error checking directory</span>';
+            });
+    });
+    
+    function showMessage(message, type) {
+        const alertsContainer = document.getElementById('alerts-container');
+        if (!alertsContainer) return;
+
+        // Remove any existing alerts
+        alertsContainer.querySelectorAll('.alert').forEach(alert => {
+            const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+            bsAlert.close();
+        });
+
+        // Create and show Bootstrap alert
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+        alertDiv.role = 'alert';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        alertsContainer.appendChild(alertDiv);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                const bsAlert = bootstrap.Alert.getOrCreateInstance(alertDiv);
+                bsAlert.close();
+            }
+        }, 5000);
+    }
+});
+</script>
+{% endblock %}

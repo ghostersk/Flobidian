@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="shortcut icon" href="{{ url_for('md_viewer.static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link type="text/css" href="{{ url_for('md_viewer.static', filename='css/app_custom_css.css') }}" rel="stylesheet">
+    <script>
+      // Function to reinitialize syntax highlighting (called after AJAX content updates)
+      function reinitializeSyntaxHighlighting() {
+        hljs.highlightAll();
+      }
+    </script>
+    <script>
+      // Apply sidebar width and minimized state before page paint to prevent flicker
+      (function() {
+        try {
+          var savedWidth = localStorage.getItem('sidebar-width');
+          var minimized = localStorage.getItem('sidebar-minimized') === 'true';
+          var style = document.createElement('style');
+          var css = '';
+          if (minimized) {
+            css += '#sidebar { width: 48px !important; min-width: 48px !important; max-width: 48px !important; overflow-x: hidden; padding-left: 0.2rem; padding-right: 0.2rem; transition: none !important; }';
+          } else if (savedWidth) {
+            css += '#sidebar { width: ' + savedWidth + ' !important; transition: none !important; }';
+          }
+          if (css) {
+            style.innerHTML = css;
+            style.setAttribute('id', 'sidebar-initial-style');
+            document.head.appendChild(style);
+          }
+        } catch (e) {}
+      })();
+
+
+
+      // Define renderObsidianImages function
+      window.renderObsidianImages = function(container) {
+          if (!container) return;
+          const obsidianImgRegex = /!\[\[([^\]]+\.(png|jpg|jpeg|gif|webp))\]\]/gi;
+          
+          container.innerHTML = container.innerHTML.replace(obsidianImgRegex, function(match, filename) {
+              // Use the Flask-provided URL template if available
+              let urlTemplate = window.attatchedImageUrlTemplate || "/serve_attatched_image/__IMAGE_PATH__";
+              
+              // Get storage settings from data attributes
+              let storageMode = container.getAttribute('data-storage-mode') || '1';
+              let noteDir = container.getAttribute('data-note-dir') || '';
+              
+              // Clean up the filename to remove any leading slashes and normalize path
+              let cleanFilename = filename.replace(/^\/+/, '').replace(/\\/g, '/');
+              
+              // Construct the image path based on storage mode
+              let imagePath;
+              if (storageMode === '1') {
+                  // Mode 1: Direct in NOTES_DIR root
+                  imagePath = cleanFilename;
+              } else if (storageMode === '2') {
+                  // Mode 2: Specific storage folder
+                  imagePath = cleanFilename.split('/').pop();
+              } else if (storageMode === '3') {
+                  // Mode 3: Same directory as note
+                  if (noteDir) {
+                      imagePath = cleanFilename.includes('/') ? 
+                          cleanFilename : 
+                          `${noteDir}/${cleanFilename}`;
+                  } else {
+                      imagePath = cleanFilename;
+                  }
+              } else if (storageMode === '4') {
+                  // Mode 4: In the attatched subfolder under note's directory
+                  let noteFolder = noteDir || '';
+                  let subfolder = container.getAttribute('data-storage-base') || 'attatched';
+                  let finalFilename = cleanFilename.split('/').pop();
+                  imagePath = noteFolder ? `${noteFolder}/${subfolder}/${finalFilename}` : `${subfolder}/${finalFilename}`;
+              } else {
+                  // Default to mode 1 behavior
+                  imagePath = cleanFilename;
+              }
+              
+              // Replace placeholder in template and ensure no double slashes
+              let imgUrl = urlTemplate.replace('__IMAGE_PATH__', encodeURIComponent(imagePath))
+                  .replace(/([^:])\/+/g, '$1/');
+              
+              return `<img src="${imgUrl}" alt="${filename}" style="max-width:100%;">`;
+          });
+      };
+
+      // Function to handle initial page load and AJAX navigation image rendering
+      function initializeImageRendering() {
+          const noteContent = document.querySelector('.card.card-body');
+          if (noteContent) {
+              window.renderObsidianImages(noteContent);
+          }
+      }
+
+      // Call on initial page load
+      document.addEventListener('DOMContentLoaded', initializeImageRendering);
+
+      // AJAX-based navigation to prevent page refresh
+      document.addEventListener('DOMContentLoaded', function() {
+        const mainContent = document.querySelector('.main-content');
+        const fileLinks = document.querySelectorAll('.file-tree-file .nav-link');
+
+        fileLinks.forEach(link => {
+          link.addEventListener('click', async function(e) {
+            e.preventDefault();
+            const url = this.href;
+
+            try {
+              // Show loading state
+              mainContent.style.opacity = '0.6';
+              
+              const response = await fetch(url);
+              if (!response.ok) throw new Error('Network response was not ok');
+              
+              const text = await response.text();
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(text, 'text/html');
+              
+              // Get new content and title
+              const newContent = doc.getElementById('content');
+              const newTitle = doc.querySelector('title').textContent;
+              
+              if (newContent) {
+                // Update URL and title without page refresh
+                history.pushState({}, newTitle, url);
+                document.title = newTitle;
+
+                // Update the content
+                const contentContainer = document.getElementById('content');
+                contentContainer.innerHTML = newContent.innerHTML;
+
+                // Reset opacity
+                mainContent.style.opacity = '1';
+
+                // Reinitialize features
+                initializeImageRendering();
+                hljs.highlightAll();
+
+                // Initialize image viewer if needed
+                if (typeof initializeImageViewer === 'function') {
+                  initializeImageViewer();
+                }
+              }
+            } catch (error) {
+              console.error('Navigation error:', error);
+              // Fallback to normal navigation if AJAX fails
+              window.location.href = url;
+            }
+          });
+        });
+
+        // Handle browser back/forward
+        window.addEventListener('popstate', function() {
+          window.location.reload();
+        });
+      });
+    </script>
+    {% include 'base_css_js_imports.html' %}
+    {% block head %}{% endblock %}
+</head>
+<body style="overflow: hidden;">
+<nav class="navbar navbar-expand-lg navbar-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{{ url_for('md_viewer.index') }}">{{ app_name }}</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto">
+        {# <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('md_viewer.create_note') }}">Create Note</a>
+        </li> #}
+      </ul>
+    </div>
+  </div>
+</nav>
+<div class="container-fluid" style="height: calc(100vh - 56px);">
+  <div class="row" style="flex-wrap:nowrap; height: 100%;">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-buttons">
+        <div class="d-flex align-items-center gap-2" style="margin-top: 0.2em;">
+          <a href="{{ url_for('md_viewer.create_note') }}" class="btn btn-primary btn-sm px-2 py-1" title="New Note" style="font-size:1.1em;"><i class="fa fa-plus"></i></a>
+          <button id="open-search-modal" class="btn btn-outline-secondary btn-sm px-2 py-1" title="Search" style="font-size:1.1em;"><i class="fa fa-search"></i></button>
+          <button id="toggle-all-dirs" class="btn btn-outline-secondary btn-sm px-2 py-1" title="Expand/Collapse All" style="font-size:1.1em;"><i class="fa fa-folder"></i></button>
+          <a href="{{ url_for('md_viewer.image_storage_settings_page') }}" class="btn btn-outline-secondary btn-sm px-2 py-1" title="Settings" style="font-size:1.1em;"><i class="fa fa-cog"></i></a>
+          <button class="sidebar-toggle btn btn-outline-secondary btn-sm px-2 py-1" title="Toggle Sidebar" style="font-size:1.1em;margin-left:auto;"><i class="fa fa-angle-double-left"></i></button>
+        </div>
+      </div>
+      <div class="resize-handle" style="position:absolute; right:0; top:0; bottom:0; width:4px; cursor:ew-resize;"></div>
+      <div class="file-tree">
+        <ul class="nav flex-column">
+        {% if notes_tree and notes_tree|length > 0 %}
+          {% macro render_tree(tree, current_path='', level=0) %}
+            {% for node in tree %}
+              {% if node.type == 'dir' %}
+                {% set dir_path = current_path + '/' + node.name if current_path else node.name %}
+                <li class="nav-item file-tree-dir">
+                  <span class="file-tree-toggle" tabindex="0" data-path="{{ dir_path }}" style="position: relative; display: block; padding: 6px 0;">
+                    <div style="padding-left: {{ level * 16 }}px;">
+                      <!-- Tree line indicators -->
+                      {% if level > 0 %}
+                        <span style="position: absolute; left: {{ (level - 1) * 16 + 7 }}px; top: 0; bottom: 0; border-left: 1px dotted rgba(255,255,255,0.1);"></span>
+                        <span style="position: absolute; left: {{ (level - 1) * 16 + 7 }}px; width: 9px; top: 50%; border-top: 1px dotted rgba(255,255,255,0.1);"></span>
+                      {% endif %}
+                      <!-- Folder icon and name -->
+                      <i class="fa {% if active_path and dir_path in active_path %}fa-folder-open text-info{% else %}fa-folder text-warning{% endif %}" style="margin-right: 5px; width: 16px; text-align: center;"></i>
+                      <span style="margin-left: 2px; opacity: 0.9;">{{ node.name }}</span>
+                    </div>
+                  </span>
+                  <ul class="nav flex-column file-tree-children" style="display: {% if active_path and dir_path in active_path %}block{% else %}none{% endif %};">
+                    {{ render_tree(node.children, dir_path, level + 1) }}
+                  </ul>
+                </li>
+              {% elif node.type == 'file' and node.name.endswith('.md') %}
+                <li class="nav-item file-tree-file">
+                  <a class="nav-link {% if node.path == current_note %}active{% endif %}" 
+                     href="{{ url_for('md_viewer.note', note_path=node.path) }}"
+                     style="position: relative; display: block; padding: 4px 0;">
+                    <div style="padding-left: {{ level * 16 }}px;">
+                      <!-- Tree line indicators -->
+                      {% if level > 0 %}
+                        <span style="position: absolute; left: {{ (level - 1) * 16 + 7 }}px; top: 0; bottom: 0; border-left: 1px dotted rgba(255,255,255,0.1);"></span>
+                        <span style="position: absolute; left: {{ (level - 1) * 16 + 7 }}px; width: 9px; top: 50%; border-top: 1px dotted rgba(255,255,255,0.1);"></span>
+                      {% endif %}
+                      <!-- File icon and name -->
+                      <i class="fa fa-file-text-o" style="margin-right: 5px; width: 16px; text-align: center; opacity: 0.7;"></i>
+                      <span style="opacity: 0.85;">{{ node.display_name if node.display_name else node.name[:-3] }}</span>
+                    </div>
+                  </a>
+                </li>
+              {% endif %}
+            {% endfor %}
+          {% endmacro %}
+          {{ render_tree(notes_tree) }}
+        {% else %}
+          <li class="nav-item ">No notes found.</li>
+        {% endif %}
+      </ul>
+    </aside>
+    <main class="main-content col py-4" style="height: 100%; overflow-y: auto;">
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="alert alert-info">{{ messages[0] }}</div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<footer class="text-center mt-3 mb-2 " style="position: absolute; width: 100%; bottom: 0; left: 0;">
+    &copy; 2025 {{ app_name }}
+</footer>
+
+    <!-- Move Bootstrap JS above custom scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Move main JS to end of body -->
+    <script>
+  // Highlight code blocks in EasyMDE preview
+  document.addEventListener('DOMContentLoaded', function() {
+    // Sidebar width and minimize persistence
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return; // Prevent errors if sidebar is missing
+    const toggleBtn = sidebar.querySelector('.sidebar-toggle');
+    const resizeHandle = sidebar.querySelector('.resize-handle');
+    const savedWidth = localStorage.getItem('sidebar-width');
+    const minimized = localStorage.getItem('sidebar-minimized') === 'true';
+    // Remove initial style tag if present
+    const initialStyle = document.getElementById('sidebar-initial-style');
+    if (initialStyle) initialStyle.remove();
+    // Set initial state
+    if (savedWidth && !minimized) sidebar.style.width = savedWidth;
+    if (minimized) {
+      sidebar.classList.add('minimized');
+      sidebar.style.width = '48px';
+      sidebar.style.minWidth = '48px';
+      sidebar.style.maxWidth = '48px';
+      sidebar.style.paddingLeft = '0.2rem';
+      sidebar.style.paddingRight = '0.2rem';
+      toggleBtn.innerHTML = '<i class="fa fa-angle-double-right"></i>';
+    } else {
+      sidebar.classList.remove('minimized');
+      sidebar.style.minWidth = '';
+      sidebar.style.maxWidth = '';
+      sidebar.style.paddingLeft = '';
+      sidebar.style.paddingRight = '';
+      toggleBtn.innerHTML = '<i class="fa fa-angle-double-left"></i>';
+    }
+    toggleBtn.addEventListener('click', function() {
+      const isMin = sidebar.classList.toggle('minimized');
+      localStorage.setItem('sidebar-minimized', isMin);
+      if (isMin) {
+        sidebar.style.width = '48px';
+        sidebar.style.minWidth = '48px';
+        sidebar.style.maxWidth = '48px';
+        sidebar.style.paddingLeft = '0.2rem';
+        sidebar.style.paddingRight = '0.2rem';
+        toggleBtn.innerHTML = '<i class="fa fa-angle-double-right"></i>';
+      } else {
+        const width = localStorage.getItem('sidebar-width') || '220px';
+        sidebar.style.width = width;
+        sidebar.style.minWidth = '';
+        sidebar.style.maxWidth = '';
+        sidebar.style.paddingLeft = '';
+        sidebar.style.paddingRight = '';
+        toggleBtn.innerHTML = '<i class="fa fa-angle-double-left"></i>';
+      }
+    });
+    // Sidebar resizing with handle
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    resizeHandle.addEventListener('mousedown', function(e) {
+      if (!sidebar.classList.contains('minimized')) {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = sidebar.offsetWidth;
+        document.body.style.cursor = 'ew-resize';
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!isResizing) return;
+      let newWidth = startWidth + (e.clientX - startX);
+      newWidth = Math.max(48, Math.min(350, newWidth));
+      sidebar.style.width = newWidth + 'px';
+    });
+    document.addEventListener('mouseup', function() {
+      if (isResizing) {
+        isResizing = false;
+        document.body.style.cursor = '';
+        if (!sidebar.classList.contains('minimized')) {
+          localStorage.setItem('sidebar-width', sidebar.style.width);
+        }
+      }
+    });
+    // Highlight.js for EasyMDE preview using MutationObserver
+    const observer = new MutationObserver(function() {
+      document.querySelectorAll('.editor-preview pre code, .editor-preview-active pre code').forEach(function(block) {
+        if (!block.classList.contains('hljs')) {
+          hljs.highlightElement(block);
+        }
+      });
+    });
+    observer.observe(document.body, { subtree: true, childList: true });
+  });
+</script>
+<script>
+  // File tree expand/collapse with state persistence
+  document.addEventListener('DOMContentLoaded', function() {
+    const toggleAllBtn = document.getElementById('toggle-all-dirs');
+    let isAllExpanded = false;
+
+    // Load expanded folders from localStorage
+    let expandedFolders = new Set(JSON.parse(localStorage.getItem('expanded-folders') || '[]'));
+
+    function updateFolderState() {
+      document.querySelectorAll('.file-tree-dir').forEach(dir => {
+        const children = dir.querySelector('.file-tree-children');
+        const icon = dir.querySelector('.file-tree-toggle .fa');
+        const isExpanded = expandedFolders.has(dir.querySelector('.file-tree-toggle').getAttribute('data-path'));
+        
+        if (children) {
+          children.style.display = isExpanded ? 'block' : 'none';
+        }
+        if (icon) {
+          icon.classList.toggle('fa-folder-open', isExpanded);
+          icon.classList.toggle('fa-folder', !isExpanded);
+          icon.classList.toggle('text-info', isExpanded);
+          icon.classList.toggle('text-warning', !isExpanded);
+        }
+      });
+    }
+
+    // Initial folder state update
+    updateFolderState();
+
+    // Tree folder toggle functionality
+    document.querySelectorAll('.file-tree-toggle').forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            const children = this.nextElementSibling;
+            const icon = this.querySelector('.fa');
+            const path = this.getAttribute('data-path');
+            
+            // Update state first
+            const isExpanding = !expandedFolders.has(path);
+            if (isExpanding) {
+                expandedFolders.add(path);
+            } else {
+                expandedFolders.delete(path);
+            }
+            localStorage.setItem('expanded-folders', JSON.stringify(Array.from(expandedFolders)));
+            
+            // Then update UI
+            if (children) {
+                children.style.display = isExpanding ? 'block' : 'none';
+                if (icon) {
+                    icon.classList.toggle('fa-folder', !isExpanding);
+                    icon.classList.toggle('fa-folder-open', isExpanding);
+                    icon.classList.toggle('text-warning', !isExpanding);
+                    icon.classList.toggle('text-info', isExpanding);
+                }
+            }
+        });
+    });
+
+    // Expand/collapse all functionality
+    document.getElementById('toggle-all-dirs').addEventListener('click', function() {
+        const allChildren = document.querySelectorAll('.file-tree-children');
+        const allIcons = document.querySelectorAll('.file-tree-toggle .fa');
+        const firstChild = allChildren[0];
+        const expandAll = firstChild ? firstChild.style.display === 'none' || !firstChild.style.display : true;
+        
+        allChildren.forEach(child => {
+            child.style.display = expandAll ? 'block' : 'none';
+        });
+        
+        allIcons.forEach(icon => {
+            if (expandAll) {
+                icon.classList.remove('fa-folder', 'text-warning');
+                icon.classList.add('fa-folder-open', 'text-info');
+            } else {
+                icon.classList.remove('fa-folder-open', 'text-info');
+                icon.classList.add('fa-folder', 'text-warning');
+            }
+        });
+
+        // Update expanded folders in localStorage
+        if (expandAll) {
+          document.querySelectorAll('.file-tree-dir').forEach(dir => {
+            expandedFolders.add(dir.querySelector('.file-tree-toggle').getAttribute('data-path'));
+          });
+        } else {
+          expandedFolders.clear();
+        }
+        localStorage.setItem('expanded-folders', JSON.stringify(Array.from(expandedFolders)));
+    });
+
+    // No separate state handler needed anymore, it's handled in the click event
+  });
+  
+  // Handle right-click on folders to navigate to folder view
+  document.querySelectorAll('.file-tree-toggle').forEach(toggle => {
+    toggle.addEventListener('contextmenu', function(e) {
+      e.preventDefault(); // Prevent the default context menu
+      
+      const folderPath = this.getAttribute('data-path');
+      if (folderPath) {
+        // Navigate to the folder view
+        window.location.href = `{{ url_for('md_viewer.folder', folder_path='') }}` + folderPath;
+      }
+    });
+  });
+</script>
+{% block scripts %}
+<script>
+// Tree folder toggle functionality
+document.querySelectorAll('.file-tree-toggle').forEach(toggle => {
+    toggle.addEventListener('click', function(e) {
+        const children = this.nextElementSibling;
+        const icon = this.querySelector('.fa');
+        if (children) {
+            children.style.display = children.style.display === 'none' ? 'block' : 'none';
+            if (icon) {
+                icon.classList.toggle('fa-folder');
+                icon.classList.toggle('fa-folder-open');
+                icon.classList.toggle('text-warning');
+                icon.classList.toggle('text-info');
+            }
+        }
+    });
+});
+
+// Expand/collapse all functionality
+document.getElementById('toggle-all-dirs').addEventListener('click', function() {
+    const allChildren = document.querySelectorAll('.file-tree-children');
+    const allIcons = document.querySelectorAll('.file-tree-toggle .fa');
+    const firstChild = allChildren[0];
+    const expandAll = firstChild ? firstChild.style.display === 'none' || !firstChild.style.display : true;
+    
+    allChildren.forEach(child => {
+        child.style.display = expandAll ? 'block' : 'none';
+    });
+    
+    allIcons.forEach(icon => {
+        if (expandAll) {
+            icon.classList.remove('fa-folder', 'text-warning');
+            icon.classList.add('fa-folder-open', 'text-info');
+        } else {
+            icon.classList.remove('fa-folder-open', 'text-info');
+            icon.classList.add('fa-folder', 'text-warning');
+        }
+    });
+});
+</script>
+{% endblock %}
+
+<!-- Notification Modal -->
+<div class="modal fade" id="notificationModal" tabindex="-1" aria-labelledby="notificationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center">
+                <div id="notificationMessage"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Global function to show notifications
+window.showNotification = function(message, type = 'success') {
+    const modal = new bootstrap.Modal(document.getElementById('notificationModal'));
+    const messageDiv = document.getElementById('notificationMessage');
+    messageDiv.className = `alert alert-${type} mb-0`;
+    messageDiv.textContent = message;
+    modal.show();
+    
+    // Auto-hide after 2 seconds for success messages
+    if (type === 'success') {
+        setTimeout(() => {
+            modal.hide();
+        }, 2000);
+    }
+};
+</script>
+</body>
+</html>

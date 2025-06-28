@@ -1,0 +1,54 @@
+<!-- Bootstrap Image Viewer Modal -->
+<div class="modal fade" id="imageViewerModal" tabindex="-1" aria-labelledby="imageViewerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-0">
+                <h5 class="modal-title text-light" id="imageViewerModalLabel"></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body d-flex align-items-center justify-content-center">
+                <img id="modalImage" src="" alt="Image Preview" style="max-height: 90vh; max-width: 90vw;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('imageViewerModal');
+    if (!modal) return;
+
+    const modalInstance = new bootstrap.Modal(modal, {
+        backdrop: true,
+        keyboard: true,
+        focus: true
+    });
+
+    const modalImage = modal.querySelector('#modalImage');
+    const modalTitle = modal.querySelector('#imageViewerModalLabel');
+
+    // Reset when modal is hidden
+    modal.addEventListener('hidden.bs.modal', function() {
+        if (modalImage) {
+            modalImage.src = '';
+        }
+    });
+
+    // Handle image links
+    document.querySelectorAll('[data-bs-toggle="image-viewer"]').forEach(function(element) {
+        element.addEventListener('click', function(e) {
+            e.preventDefault();
+            const imageUrl = this.getAttribute('data-image-url');
+            const imageTitle = this.getAttribute('data-image-title');
+            
+            if (modalImage && imageUrl) {
+                modalImage.src = imageUrl;
+                if (modalTitle) {
+                    modalTitle.textContent = imageTitle || '';
+                }
+                modalInstance.show();
+            }
+        });
+    });
+});
+</script>

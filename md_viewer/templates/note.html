@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ app_name }} - {{ title }}{% endblock %}
+{% block head %}
+    {% include 'base_css_js_imports.html' %}
+    <style>
+        .card-body {
+            white-space: normal;  /* Default normal text wrapping */
+        }
+        /* Style for code blocks by default */
+        .card-body pre {
+            white-space: pre-wrap;  /* Default to wrapping code */
+            word-wrap: break-word;  /* Break long words if needed */
+            max-width: 100%;        /* Ensure it stays within bounds */
+        }
+        .card-body pre code {
+            white-space: inherit;   /* Inherit wrapping from pre */
+        }
+        /* No-wrap styles */
+        .card-body.nowrap pre {
+            white-space: pre;
+            overflow-x: auto;
+            word-wrap: normal;
+        }
+        .card-body.nowrap pre code {
+            white-space: pre;
+        }
+    </style>
+    <script>hljs.highlightAll();</script>
+{% endblock %}
+{% block content %}
+<div id="content">
+    {% include '_breadcrumbs.html' %}
+    <div class="mb-3">
+    <div class="mb-3">
+        <a href="{{ url_for('md_viewer.edit_note', note_path=current_note) }}" class="btn btn-outline-secondary btn-sm">Edit</a>
+        <form action="{{ url_for('md_viewer.delete_note', note_path=current_note) }}" method="post" style="display:inline;">
+            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this note?');">Delete</button>
+        </form>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="toggle-wrap">
+            <i class="fa fa-align-left"></i> Toggle Wrap
+        </button>
+        <a href="{{ url_for('md_viewer.index') }}" class="btn btn-link btn-sm">Back to Notes</a>
+    </div>
+    <div class="card card-body" 
+         data-note-dir="{{ current_note.rsplit('/', 1)[0] if '/' in current_note else '' }}"
+         data-storage-mode="{{ storage_mode }}"
+         data-storage-base="{{ storage_base }}">
+        {{ html_content|safe }}
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('md_viewer.static', filename='js/app_custom_js.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleWrapBtn = document.getElementById('toggle-wrap');
+    const contentDiv = document.querySelector('.card-body');
+    
+    // Load saved wrap setting (default to true/wrapped if not set)
+    const isWrapped = localStorage.getItem('noteViewWrap') !== 'false';
+    if (!isWrapped) {
+        contentDiv.classList.add('nowrap');
+    }
+    
+    toggleWrapBtn.addEventListener('click', function() {
+        contentDiv.classList.toggle('nowrap');
+        const nowWrapped = !contentDiv.classList.contains('nowrap');
+        localStorage.setItem('noteViewWrap', nowWrapped);
+    });
+});
+</script>
+{% endblock %}

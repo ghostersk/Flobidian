@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ app_name }} Edit {{ title }}{% endblock %}
+
+{% block head %}
+    {% include 'base_css_js_imports.html' %}
+{% endblock %}
+
+{% block content %}
+<form method="post" id="editForm">
+    <div class="mb-3" 
+         data-note-dir="{{ note_dir }}"
+         data-storage-mode="{{ storage_mode }}"
+         data-storage-base="{{ storage_base }}">
+        <label for="content" class="form-label">Content</label>
+        <textarea id="content" name="content" class="form-control" rows="12">{{ content }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{{ url_for('md_viewer.note', note_path=current_note) }}" class="btn btn-secondary">Cancel</a>
+</form>
+
+<!-- Save Status Modal -->
+<div class="modal fade" id="saveStatusModal" tabindex="-1" aria-labelledby="saveStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content bg-dark">
+            <div class="modal-body text-center p-4">
+                <div id="saveStatusMessage" class="text-light"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.attatchedImageUrlTemplate = "{{ url_for('md_viewer.serve_attatched_image', image_path='__IMAGE_PATH__') }}";
+  
+  // Initialize Bootstrap modal
+  let saveModal;
+  document.addEventListener('DOMContentLoaded', function() {
+    saveModal = new bootstrap.Modal(document.getElementById('saveStatusModal'));
+  });
+
+  // Show status message in modal
+  function showSaveStatus(message, isError = false) {
+    const statusDiv = document.getElementById('saveStatusMessage');
+    statusDiv.textContent = message;
+    statusDiv.className = isError ? 'text-danger' : 'text-success';
+    saveModal.show();
+    setTimeout(() => saveModal.hide(), 1500);
+  }
+
+  // Handle Ctrl+S
+  document.addEventListener('keydown', async function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      
+      try {
+        // Get content directly from EasyMDE
+        const content = easyMDE.value();
+        
+        // Create FormData with the current editor content
+        const formData = new FormData();
+        formData.append('content', content);
+        
+        // Send POST request with AJAX header
+        const response = await fetch(window.location.pathname, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          showSaveStatus(data.message || 'Saved successfully!');
+          // Keep editor focused
+          if (easyMDE) {
+            easyMDE.codemirror.focus();
+          }
+        } else {
+          throw new Error(data.message || 'Save failed');
+        }
+      } catch (error) {
+        showSaveStatus('Error saving document', true);
+        console.error('Save error:', error);
+      }
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
+<script src="{{ url_for('md_viewer.static', filename='js/app_custom_js.js') }}"></script>
+<script>
+// Initialize highlight.js
+window.hljs = hljs;
+
+// Configure highlight.js with secure options
+hljs.configure({
+    ignoreUnescapedHTML: true,
+    throwUnescapedHTML: false,
+    languages: [
+        'python',
+        'javascript',
+        'typescript',
+        'bash',
+        'shell',
+        'powershell',
+        'json',
+        'yaml',
+        'markdown',
+        'css',
+        'sql',
+        'xml',
+        'ini',
+        'dockerfile'
+    ]
+});
+
+const easyMDE = new EasyMDE({
+    element: document.getElementById('content'),
+    renderingConfig: {
+        codeSyntaxHighlighting: true,
+        markedOptions: {
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(code, { language: lang }).value;
+                    } catch (e) {}
+                }
+                try {
+                    return hljs.highlightAuto(code).value;
+                } catch (e) {}
+                return code;
+            }
+        }
+    },
+    uploadImage: true,
+    imageUploadFunction: async function(file, onSuccess, onError) {
+        try {
+            let notePath = "{{ current_note }}";
+            const formData = new FormData();
+            formData.append('image', file);
+            const response = await fetch(`/upload_image/${notePath}`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            
+            // Use the markdown link returned from the server
+            const cm = easyMDE.codemirror;
+            cm.replaceSelection(data.markdown);
+            // Do NOT call onSuccess here to avoid double insertion
+        } catch (error) {
+            onError(error.message || 'Failed to upload image');
+        }
+    },
+    insertTexts: {
+        image: ["![[", "]]"]
+    },
+    previewRender: function(plainText) {
+        // First, escape the markdown using EasyMDE's default renderer
+        let preview = this.parent.markdown(plainText);
+        
+        // After the markdown is rendered, initialize highlighting on any code blocks
+        setTimeout(() => {
+            const previewPane = document.querySelector('.editor-preview');
+            if (previewPane) {
+                // Copy storage settings from parent container
+                const editorContainer = document.querySelector('.mb-3[data-note-dir]');
+                if (editorContainer) {
+                    previewPane.setAttribute('data-note-dir', editorContainer.getAttribute('data-note-dir'));
+                    previewPane.setAttribute('data-storage-mode', editorContainer.getAttribute('data-storage-mode'));
+                    previewPane.setAttribute('data-storage-base', editorContainer.getAttribute('data-storage-base'));
+                }
+                window.renderObsidianImages(previewPane);
+            }
+            document.querySelectorAll('pre code').forEach((block) => {
+                // Skip if already highlighted
+                if (block.getAttribute('data-highlighted') === 'yes') {
+                    return;
+                }
+                
+                // Get the language if specified in the class
+                const language = Array.from(block.classList)
+                    .find(cls => cls.startsWith('language-'))
+                    ?.substring(9);
+                
+                try {
+                    // Apply highlighting using the current API
+                    hljs.highlightElement(block);
+                } catch (e) {
+                    // Silently handle errors without console output
+                }
+            });
+        }, 0);
+        
+        return preview;
+    }
+});
+</script>
+{% endblock %}

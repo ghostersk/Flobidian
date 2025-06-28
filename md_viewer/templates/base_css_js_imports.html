@@ -1,0 +1,40 @@
+{% block head %}
+<!-- Download any languages from: https://highlightjs.org/#usage -->
+<!-- Local highlight.js files can be used if you have them in your static folder
+<link rel="stylesheet" href="{{ url_for('md_viewer.static', filename='highlight/styles/github-dark.min.css') }}">
+<script src="{{ url_for('md_viewer.static', filename='highlight/highlight.min.js') }}"></script>
+
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/python.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/javascript.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/typescript.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/bash.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/shell.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/powershell.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/json.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/yaml.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/markdown.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/css.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/sql.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/xml.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/ini.min.js') }}"></script>
+<script src="{{ url_for('md_viewer.static', filename='highlight/languages/dockerfile.min.js') }}"></script>
+-->
+<!-- Using Public CDN for highlight.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/shell.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/powershell.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/ini.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/dockerfile.min.js"></script>
+
+{% endblock %}

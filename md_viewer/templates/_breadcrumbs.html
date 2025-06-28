@@ -1,0 +1,17 @@
+<!-- _breadcrumbs.html -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb p-0 m-0 bg-transparent" style="font-size: 0.97em;">
+        {% for crumb in breadcrumbs %}
+            <li class="breadcrumb-item {% if loop.last %}active{% endif %}" {% if loop.last %}aria-current="page"{% endif %} style="padding-right: 0;">
+                {% if crumb.url %}
+                    <a href="{{ crumb.url }}" class="text-info text-decoration-none" style="opacity: 0.9; transition: opacity 0.2s, color 0.2s;" onmouseover="this.style.opacity='1'; this.style.color='#17a2b8';" onmouseout="this.style.opacity='0.9'; this.style.color='';">{{ crumb.name }}</a>
+                {% else %}
+                    <span class="text-light" style="opacity: 0.95;">{{ crumb.name }}</span>
+                {% endif %}
+                {% if not loop.last %}
+                    <span class="text-light" style="opacity: 0.6; margin: 0 0.3em;">&gt;</span>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ol>
+</nav>
